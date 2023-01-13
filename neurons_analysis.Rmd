@@ -218,10 +218,8 @@ pca_pX <- summary(prcomp(tpX, scale. = F, center = F))
 ```
 
 ```{r}
-# Test/ example
-
 mt <- multige_im(X = pX, p = p_fpx, lineages = lins,
-                 dim_red = 'ica', nc = 8,
+                 dim_red = 'ica', nc = 60,
                  formulas = c("X~s(embryo.time, bs='cr', k=6)",
                               "X~s(embryo.time, bs='cr', k=6)",
                               "X~s(embryo.time, bs='cs', k=6)",
@@ -230,8 +228,6 @@ mt <- multige_im(X = pX, p = p_fpx, lineages = lins,
                               "X~s(embryo.time, bs='cr', k=5)",
                               "X~s(embryo.time, bs='cr', k=4)",
                               "X~s(embryo.time, bs='cr', k=4)"))
-
-
 
 # predict new data (in comp. space)
 newdat <- data.frame(embryo.time=seq(1,11, l=100))
@@ -245,7 +241,7 @@ sapply(seq_along(mt$lineages), function(li){
   sl <- mt$lineages[[li]]
   svg(paste0("fig/neurons_test_", names(mt$lineages)[li],".svg"))
   par(mfrow = c(5,8/2), mar=c(3,1,2,1), bty='l', pty='s')
-  sapply(1:8, function(ci){
+  sapply(1:ncs, function(ci){
     plot(p_fpx$embryo.time[sl], mt$dim_red$S[sl,ci], xlab = "time", ylab="IC",
          col = transp(cols, a=.2), pch = pchs,
          main = paste0(names(mt$lineages)[li], "lin, IC", mt$dim_red$ncs[ci]),
