@@ -209,104 +209,44 @@ lins <- list(
 )
 
 tpX <- scale(t(pX), scale = FALSE, center = TRUE) 
-# PCA
-pca_pX <- summary(prcomp(tpX, scale. = F, center = F))
 
-ncs <- 1:8
-lapply(seq_along(lins), function(li){ # for each lineage
-  l <- lins[[li]]
-  svg(paste0("fig/neurons_lineage_", names(lins[li]), "_pca.svg"))
-  par(mfrow = c(5, max(ncs) / 2), mar=c(3,1,2,1), pty='s', bty='l')
-  sapply(ncs, function(i){ # for each component
-    plot(p_fpx$embryo.time, pca_pX$x[,i], 
-         col = transp(cols, a=.2), pch = pchs,
-         xlab = "blast stage", ylab = "PC",
-         ylim=range(pca_pX$x[,i]),
-         main = paste0(names(lins)[li]," lin, PC",i))
-    points(p_fpx$embryo.time[l], pca_pX$x[l,i], lwd=2,
-           col = cols[l], pch = pchs[l])
-    
-  })
-  dev.off()
-})
+mt <- multige_im(X = pX, p = p_fpx, lineages = lins,
+                 dim_red = 'ica', nc = 8,
+                 formulas = c("X~s(embryo.time, bs='cr', k=6)",
+                              "X~s(embryo.time, bs='cr', k=6)",
+                              "X~s(embryo.time, bs='cs', k=6)",
+                              "X~s(embryo.time, bs='cr', k=5)",
+                              "X~s(embryo.time, bs='cr', k=5)",
+                              "X~s(embryo.time, bs='cr', k=5)",
+                              "X~s(embryo.time, bs='cr', k=4)",
+                              "X~s(embryo.time, bs='cr', k=4)"))
 
-# GAM model on PCs
-model_gam_pca <- function(X, p, formula, nc = ncol(X), subset=T){
-  formula <- stats::as.formula(formula)
-  
-  tXc <- scale(t(X), center=T, scale = F)
-  pca <- stats::prcomp(tXc, center=F, scale=F, rank=nc)
-  pca$gcenters <- attr(tXc, "scaled:center")
-  
-  # subset PCs and p according to lineage
-  pca$x <- pca$x[subset, ]
-  p <- p[subset, ]
-  
-  formulas <- lapply(seq_len(nc), function(i) stats::update(formula, paste0("PC", i, " ~ .")))
-  colnames(pca$x) <- paste0("PC", seq_len(nc))
-  p <- cbind(p, pca$x)
-  
-  m <- list()
-  m$model <- lapply(formulas, mgcv::gam, data = p)
-  m$pca <- pca
-  
-  return(m)
-}
-
-# predict gam output
-predict_gam_pca <- function(m, newdata, as.pc = FALSE){
-  preds <- do.call(cbind, lapply(m$model, predict, newdata = newdata))
-  
-  if(!as.pc)
-    return(apply(tcrossprod(m$pca$rotation, preds), 2, function(co) co + m$pca$gcenters))
-  else return(preds)
-}
-
-ncs <- 1:8
-# build models
-ms <- lapply(seq_along(lins), function(li){
-  m <- model_gam_pca(X = pX, p = p_fpx, # gene expr and pdata
-                     nc = max(ncs), # components to use
-                     formula = "X~s(embryo.time, bs='cr', k=6)", # gam formula
-                     subset = lins[[li]] # lineage subset
-  )
-})
-
-# build prediction data
+# predict new data (in comp. space)
 ndat <- data.frame(embryo.time=seq(min(p_fpx$embryo.time), max(p_fpx$embryo.time), l=100))
+nX <- predict_mgeim(mt, ndat, as.c = T)
+interpGE <- predict_mgeim(mt, ndat)
 
-# predict in component space
-ps_c <- lapply(ms, predict_gam_pca, newdata=ndat, as.pc=T)
-
-# build refs (=predict in gene space)
-rfs <- lapply(seq_along(ms), function(i)
-  list(interpGE=predict_gam_pca(ms[[i]], ndat), 
-       time=ndat$embryo.time))
-
-lapply(seq_along(lins), function(li){ # for each lineage
-  l <- lins[[li]]
-  svg(paste0("fig/neurons_lineage_", names(lins[li]), "_interpolation.svg"))
-  par(mfrow = c(5,max(ncs) / 2), mar=c(3,1,2,1), pty='s', bty='l')
-  sapply(ncs, function(i){ # for each component
-    plot(p_fpx$embryo.time, pca_pX$x[,i], 
+ncs <- 1:8
+sapply(seq_along(mt$lineages), function(li){
+  l <- mt$lineages[[li]]
+  svg(paste0("fig/neurons_lineage_", names(mt$lineages)[li],"_ica.svg"))
+  par(mfrow = c(5,8/2), mar=c(3,1,2,1), bty='l', pty='s')
+  sapply(ncs, function(ci){
+    plot(p_fpx$embryo.time[l], mt$dim_red$S[l,ci], xlab = "time", ylab="IC",
          col = transp(cols, a=.2), pch = pchs,
-         xlab = "blast stage", ylab = "PC",
-         ylim=range(pca_pX$x[,i]),
-         main = paste0(names(lins)[li]," lin, PC",i))
-    # show lineage-specific points 
-    points(p_fpx$embryo.time[l], pca_pX$x[l,i], lwd=2,
-           col = cols[l], pch = pchs[l])
-    
-    # add interpolation
-    points(ndat$embryo.time, ps_c[[li]][,i], lwd=2, type = "l", col='green')
+         main = paste0(names(mt$lineages)[li], "lin, IC", mt$dim_red$ncs[ci]),
+         ylim = range(mt$dim_red$S[,ci]), xlim = range(p_fpx$embryo.time))
+    points(p_fpx$embryo.time[-l], mt$dim_red$S[-l,ci], cex = .1, col = cols[l], pch = pchs[l], lw=2)
+    points(ndat$embryo.time, nX[[li]][,ci], type  ='l', col = 'red')
   })
   dev.off()
 })
 
 # staging
 
-ae_s <- lapply(rfs, function(r){
-  RAPToR::ae(pX, refdata = r$interpGE, ref.time_series = r$time, bootstrap.n = 30)
+ae_s <- lapply(interpGE, function(rdat){
+  RAPToR::ae(samp = pX, refdata = rdat, ref.time_series = ndat$embryo.time,
+     bootstrap.n = 30)
 })
 
 svg("fig/neurons_staging.svg")
@@ -327,7 +267,6 @@ sapply(seq_along(lins), function(i){
     mtext(text = paste0("r = ", round(cor(x, y, method = 'pearson'), 3),
                         "\nrho =", round(cor(x, y, method = 'spearman'), 3)),
           at = 1, side = 3, line = -2, cex = .8, adj = 0)
-    
   })
 })
 dev.off()
@@ -341,43 +280,6 @@ sapply(ctypes[c(1,5,4,6,3,2)], function(ci){
   
   # get cor. score at estimate for each reference
   ccs <- do.call(cbind, lapply(ae_s, function(a) a$age.estimates[ss,"cor.score"]))
-  colnames(ccs) <- names(lins)
-  boxplot(ccs, border=seq_along(lins), las=2,
-          lwd=2, ylim=c(0, 1), col = 0, boxwex=.4,
-          ylab = "Cor. at estimate", xlab = "reference used", main = ci)
-  mtext(paste0('n=',length(ss)), at=.5, line=-1, cex=.75, side=3, adj = 0)
-  
-})
-dev.off()
-
-# redo with more data
-
-ncs <- 1:40 # 90% of varexp
-# build models
-ms2 <- lapply(seq_along(lins), function(li){
-  m <- model_gam_pca(X = pX, p = p_fpx, # gene expr and pdata
-                     nc = max(ncs), # components to use
-                     formula = "X~s(embryo.time, bs='cr', k=6)", # gam formula
-                     subset = lins[[li]] # lineage subset
-  )
-})
-
-# build refs (=predict in gene space)
-rfs2 <- lapply(seq_along(ms), function(i)
-  list(interpGE=predict_gam_pca(ms2[[i]], ndat), 
-       time=ndat$embryo.time))
-
-ae_s2 <- lapply(rfs2, function(r){
-  RAPToR::ae(pX, refdata = r$interpGE, ref.time_series = r$time, bootstrap.n = 30)
-})
-
-svg("fig/neurons_lineage_inference_2.svg")
-par(mfrow = c(2,3), mar=c(3,2,2,1), bty='l')
-sapply(ctypes[c(1,5,4,6,3,2)], function(ci){
-  ss <- which(cell_subtypes==ci) # select a cell type
-  
-  # get cor. score at estimate for each reference
-  ccs <- do.call(cbind, lapply(ae_s2, function(a) a$age.estimates[ss,"cor.score"]))
   colnames(ccs) <- names(lins)
   boxplot(ccs, border=seq_along(lins), las=2,
           lwd=2, ylim=c(0, 1), col = 0, boxwex=.4,
@@ -402,29 +304,6 @@ sapply(ctypes[c(1,5,4,6,3,2)], function(ci){
   colnames(ccs) <- names(lins)
   plot(range(p_fpx$embryo.time), range(ccs), type = 'n',
        lwd=2, ylim=c(0, .05), col = 0,
-       ylab = "Correlation diff. between lineages", xlab = "Blast. time", main = ci)
-  sapply(seq_along(lins), function(i){
-    points(x, ccs[,i], col = transp(i, a = .9), lwd=2)
-  })
-  if(ci==ctypes[1])
-    legend('right', bty='n', legend=names(lins), 
-           lwd=3, lty=NA, pch=1, col=seq_along(lins),
-           title = "Reference")
-})
-dev.off()
-
-svg("fig/neurons_lineage_inference_norm_2.svg")
-par(mfrow = c(2,3), mar=c(3,2,2,1), bty='l', pty='s')
-sapply(ctypes[c(1,5,4,6,3,2)], function(ci){
-  ss <- which(cell_subtypes==ci) # select a cell type
-  
-  # get cor. score at estimate for each reference
-  ccs <- do.call(cbind, lapply(ae_s2, function(a) a$age.estimates[ss,"cor.score"]))
-  ccs <- t(apply(ccs,1, levelmin))
-  x <- p_fpx$embryo.time[ss]
-  colnames(ccs) <- names(lins)
-  plot(range(p_fpx$embryo.time), range(ccs), type = 'n',
-       lwd=2, ylim=c(0, .11), col = 0,
        ylab = "Correlation diff. between lineages", xlab = "Blast. time", main = ci)
   sapply(seq_along(lins), function(i){
     points(x, ccs[,i], col = transp(i, a = .9), lwd=2)
