@@ -30,6 +30,7 @@ library(viridis)
 library(wormRef)
 
 source("multige_im.R")
+source("utils.R")
 ```
 
 ```{r}
@@ -194,15 +195,6 @@ p_fpx$embryo.time <- p_fpx$embryo.time - min(p_fpx$embryo.time) + 1
 
 cell_subtypes <- seu$cell.subtype
 
-# for plotting
-cols <- viridisLite::inferno(max(p_fpx$embryo.time), end=.9)[p_fpx$embryo.time]
-pchs <- as.numeric(as.factor(cell_subtypes))
-transp <- function(col, a=.5){
-  # make color transparent 
-  colr <- col2rgb(col)
-  return(rgb(colr[1,], colr[2,], colr[3,], a*255, maxColorValue = 255))
-}
-
 ctypes <- unique(cell_subtypes)
 
 # define lineage cell sets
@@ -211,122 +203,202 @@ lins <- list(
   AUA = cell_subtypes %in% ctypes[c(1, 5, 6)],
   ASE = cell_subtypes %in% ctypes[c(1, 2, 3)]
 )
-
-tpX <- scale(t(pX), scale = FALSE, center = TRUE)
-
-pca_pX <- summary(prcomp(tpX, scale. = F, center = F))
 ```
+
+```{r message=FALSE, results=FALSE}
+prepare_and_interpolate <- function(X, p, lins, dim_red="ica", nc=8){
+  mt <- multige_im(X = X, p = p, lineages = lins,
+                   dim_red = dim_red, nc = nc,
+                   formulas = c("X~s(embryo.time, bs='cr', k=6)",
+                                "X~s(embryo.time, bs='cr', k=6)",
+                                "X~s(embryo.time, bs='cs', k=6)",
+                                "X~s(embryo.time, bs='cr', k=5)",
+                                "X~s(embryo.time, bs='cr', k=5)",
+                                "X~s(embryo.time, bs='cr', k=5)",
+                                "X~s(embryo.time, bs='cr', k=4)",
+                                "X~s(embryo.time, bs='cr', k=4)"))
+  
+  # predict new data (in comp. space)
+  ndat <- data.frame(embryo.time=seq(min(p$embryo.time),
+                                     max(p$embryo.time), l=100))
+  nX <- predict_mgeim(mt, ndat, as.c = T)
+  interpGE <- predict_mgeim(mt, ndat)
+  
+  return(list(mt=mt, ndat=ndat, nX=nX, interpGE=interpGE))
+}
+```
+
+# RAPToR
 
 ```{r}
-mt <- multige_im(X = pX, p = p_fpx, lineages = lins,
-                 dim_red = 'ica', nc = 60,
-                 formulas = c("X~s(embryo.time, bs='cr', k=6)",
-                              "X~s(embryo.time, bs='cr', k=6)",
-                              "X~s(embryo.time, bs='cs', k=6)",
-                              "X~s(embryo.time, bs='cr', k=5)",
-                              "X~s(embryo.time, bs='cr', k=5)",
-                              "X~s(embryo.time, bs='cr', k=5)",
-                              "X~s(embryo.time, bs='cr', k=4)",
-                              "X~s(embryo.time, bs='cr', k=4)"))
+# build train and test
+p <- 0.8
+rr <- split(1:length(cell_subtypes), cell_subtypes)
+idx <- sort(as.numeric(unlist(sapply(rr, function(x) sample(x, length(x) * p)))))
 
-# predict new data (in comp. space)
-ndat <- data.frame(embryo.time=seq(min(p_fpx$embryo.time), max(p_fpx$embryo.time), l=100))
-nX <- predict_mgeim(mt, ndat, as.c = T)
-interpGE <- predict_mgeim(mt, ndat)
+pX_train <- pX[idx, ]
+pX_test <- pX[-idx, ]
+
+p_fpx_train <- p_fpx[idx, ]
+p_fpx_test <- p_fpx[-idx, ]
 ```
 
-# interpolation
+First let's build sets with 80/20 while keeping original proportions. In other words, stratified splitting of the dataset.
 
-```{r, message=FALSE, results=FALSE, fig.dim=c(8, 5)}
-ncs <- 1:8
-par(mfrow = c(3,8), mar=c(3,1,2,1), bty='l', pty='s')
-sapply(seq_along(mt$lineages), function(li){
-  l <- mt$lineages[[li]]
-  sapply(ncs, function(ci){
-    plot(p_fpx$embryo.time[l], mt$dim_red$S[l,ci], xlab = "time", ylab="IC",
-         col = transp(cols, a=.2), pch = pchs,
-         main = paste0(names(mt$lineages)[li], "lin, IC", mt$dim_red$ncs[ci]),
-         ylim = range(mt$dim_red$S[,ci]), xlim = range(p_fpx$embryo.time))
-    points(p_fpx$embryo.time[-l], mt$dim_red$S[-l,ci], cex = .1, col = cols[l], pch = pchs[l], lw=2)
-    points(ndat$embryo.time, nX[[li]][,ci], type='l', col = 'red')
-  })
-})
+Original proportions :
+```{r}
+table(p_fpx$cell.subtype) / nrow(p_fpx)
+```
+
+Train proportions :
+```{r}
+table(p_fpx_train$cell.subtype) / nrow(p_fpx_train)
+```
+
+Test proportions :
+```{r}
+table(p_fpx_test$cell.subtype) / nrow(p_fpx_test)
+```
+
+We can see that the proportions are similar enough.
+
+# Interpolation
+
+```{r, message=FALSE, results=FALSE}
+multige <- prepare_and_interpolate(pX, p_fpx, lins)
+
+plot_lineages(multige$mt, multige$ndat, multige$nX,
+              p_fpx$embryo.time, p_fpx$cell.subtype, 1:8)
 ```
 
 # Staging
 
 ```{r, message=FALSE, results=FALSE}
-ae_s <- lapply(interpGE, function(rdat){
-  RAPToR::ae(samp = pX, refdata = rdat, ref.time_series = ndat$embryo.time,
-     bootstrap.n = 30)
-})
-
-par(mfrow = c(3,3), mar=c(3,1,2,1), pty='s', bty='l')
-xl <- range(p_fpx$embryo.time)
-sapply(seq_along(lins), function(i){
-  l <- lins[[i]]
-  sapply(seq_along(lins), function(j){
-    x <- p_fpx$embryo.time[l]
-    y <- ae_s[[j]]$age.estimates[l,1]
-    
-    plot(x, y, xlim = xl, ylim = xl,
-         main = paste0(names(lins)[i], ' lin /', names(lins)[j], ' ref'), 
-         col = i, xlab = "Blast. time", ylab="Estimated age")
-    
-    abline(a=0, b=1, lty=2) # add x=y
-    # add cor.scores
-    mtext(text = paste0("r = ", round(cor(x, y, method = 'pearson'), 3),
-                        "\nrho =", round(cor(x, y, method = 'spearman'), 3)),
-          at = 1, side = 3, line = -2, cex = .8, adj = 0)
+res <- lapply(1:4, function(i){
+  idx <- stratified_split(cell_subtypes)
+  
+  pX_train <- pX[, idx]
+  pX_test <- pX[, -idx]
+  
+  p_fpx_train <- p_fpx[idx, ]
+  p_fpx_test <- p_fpx[-idx, ]
+  
+  lins_train <- lapply(lins,'[', idx)
+  lins_test <- lapply(lins,'[', -idx)
+  
+  multige <- prepare_and_interpolate(pX_train, p_fpx_train, lins_train)
+  
+  ae_s_train <- lapply(multige$interpGE, function(rdat){
+    RAPToR::ae(samp = pX_train, refdata = rdat, ref.time_series = multige$ndat$embryo.time,
+        bootstrap.n = 30)
   })
+  
+  ae_s_test <- lapply(multige$interpGE, function(rdat){
+    RAPToR::ae(samp = pX_test, refdata = rdat, ref.time_series = multige$ndat$embryo.time,
+        bootstrap.n = 30)
+  })
+  
+  return(list(multige=multige,
+              train=list(idx=idx,
+                         ae_s=ae_s_train),
+              test=list(idx=seq_along(cell_subtypes)[!seq_along(cell_subtypes) %in% idx],
+                        ae_s=ae_s_test)))
 })
+```
+
+Predictions for train :
+
+```{r, message=FALSE, results=FALSE}
+plot_staged(res[[1]]$train$ae_s, p_fpx[res[[1]]$train$idx, ]$embryo.time, lapply(lins,'[', res[[1]]$train$idx))
+```
+
+Predictions for test :
+
+```{r, message=FALSE, results=FALSE}
+plot_staged(res[[1]]$test$ae_s, p_fpx[res[[1]]$test$idx, ]$embryo.time, lapply(lins,'[', res[[1]]$test$idx))
+```
+
+Results from 4 differents runs :
+
+train pearson r :
+```{r}
+reduce_cor(res, lins, p_fpx, "train", "pearson")
+```
+
+train spearman rho :
+```{r}
+reduce_cor(res, lins, p_fpx, "train", "spearman")
+```
+
+test pearson r :
+```{r}
+reduce_cor(res, lins, p_fpx, "test", "pearson")
+```
+
+test spearman rho :
+```{r}
+reduce_cor(res, lins, p_fpx, "test", "spearman")
 ```
 
 # Exploring lineage-inference from staging
 
 ```{r, message=FALSE, results=FALSE}
-par(mfrow = c(2,3), mar=c(3,3,2,1), bty='l')
-sapply(ctypes[c(1,5,4,6,3,2)], function(ci){
-  ss <- which(cell_subtypes==ci) # select a cell type
-  
-  # get cor. score at estimate for each reference
-  ccs <- do.call(cbind, lapply(ae_s, function(a) a$age.estimates[ss,"cor.score"]))
-  colnames(ccs) <- names(lins)
-  boxplot(ccs, border=seq_along(lins), las=2,
-          lwd=2, ylim=c(0, 1), col = 0, boxwex=.4,
-          ylab = "Cor. at estimate", xlab = "reference used", main = ci)
-  mtext(paste0('n=',length(ss)), at=.5, line=-1, cex=.75, side=3, adj = 0)
-})
+plot_lineages_inference(res[[1]]$train$ae_s,
+                        p_fpx[res[[1]]$train$idx, ]$cell.subtype,
+                        ctypes[c(1,5,4,6,3,2)],
+                        lapply(lins,'[', res[[1]]$train$idx))
 ```
 
-# Normalize
-
-Since we only want to observe differences in correlation between lineages, we normalize for each cell by subtracting the smallest correlation score between lineages. This way, we remove the effect of sample quality or stage/age on the base correlation score, and only observe the effect of using different lineage references.
-
-First with the 8th first dimensions.
 
 ```{r, message=FALSE, results=FALSE}
-# function to normalize by min value in series
-levelmin <- function(x){(x-min(x))}
+plot_lineages_inference(res[[1]]$test$ae_s,
+                        p_fpx[res[[1]]$test$idx, ]$cell.subtype,
+                        ctypes[c(1,5,4,6,3,2)],
+                        lapply(lins,'[', res[[1]]$test$idx))
+```
 
-par(mfrow = c(2,3), mar=c(3,2,2,1), bty='l', pty='s')
-sapply(ctypes[c(1,5,4,6,3,2)], function(ci){
-  ss <- which(cell_subtypes==ci) # select a cell type
-  
-  # get cor. score at estimate for each reference
-  ccs <- do.call(cbind, lapply(ae_s, function(a) a$age.estimates[ss,"cor.score"]))
-  ccs <- t(apply(ccs,1, levelmin))
-  x <- p_fpx$embryo.time[ss]
-  colnames(ccs) <- names(lins)
-  plot(range(p_fpx$embryo.time), range(ccs), type = 'n',
-       lwd=2, ylim=range(ccs), col = 0,
-       ylab = "Correlation diff. between lineages", xlab = "Blast. time", main = ci)
-  sapply(seq_along(lins), function(i){
-    points(x, ccs[,i], col = transp(i, a = .9), lwd=2)
-  })
-  if(ci==ctypes[1])
-    legend('right', bty='n', legend=names(lins), 
-           lwd=3, lty=NA, pch=1, col=seq_along(lins),
-           title = "Reference")
-})
+Results from 4 different runs :
+
+train :
+```{r}
+reduce_summary(res, lins, ctypes[c(1,5,4,6,3,2)], "train")
+```
+
+test :
+```{r}
+reduce_summary(res, lins, ctypes[c(1,5,4,6,3,2)], "test")
+```
+
+# Normalization
+
+Predictions for train :
+
+```{r, message=FALSE, results=FALSE}
+plot_lineage_inference_norm(res[[1]]$train$ae_s,
+                            p_fpx[res[[1]]$train$idx, ]$cell.subtype,
+                            ctypes[c(1,5,4,6,3,2)],
+                            p_fpx[res[[1]]$train$idx, ]$embryo.time,
+                            lapply(lins,'[', res[[1]]$train$idx))
+```
+
+Predictions for test :
+
+```{r, message=FALSE, results=FALSE}
+plot_lineage_inference_norm(res[[1]]$test$ae_s,
+                            p_fpx[res[[1]]$test$idx, ]$cell.subtype,
+                            ctypes[c(1,5,4,6,3,2)],
+                            p_fpx[res[[1]]$test$idx, ]$embryo.time,
+                            lapply(lins,'[', res[[1]]$test$idx))
+```
+
+Results from 4 different runs :
+
+train :
+```{r}
+reduce_norm_summary(res, lins, ctypes[c(1,5,4,6,3,2)], "train")
+```
+
+test :
+```{r}
+reduce_norm_summary(res, lins, ctypes[c(1,5,4,6,3,2)], "test")
 ```
