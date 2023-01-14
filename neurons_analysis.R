@@ -116,7 +116,7 @@ dev.off()
 
 # search clusters ----
 seu <- FindNeighbors(seu, verbose = FALSE, dims = 1:50)
-seu <- FindClusters(seu, algorithm = 1, random.seed = 654, resolution = 1.9)
+seu <- FindClusters(seu, algorithm = 1, random.seed = 654, resolution = 1.25)
 
 # Leiden algorithm doesn't seems to work
 # library(leiden)
@@ -177,11 +177,13 @@ prepare_and_interpolate <- function(X, p, lins, dim_red="ica", nc=8){
 
 multige <- prepare_and_interpolate(pX, p_fpx, lins)
 
+svg("fig/neurons_lineage.svg")
 plot_lineages(multige$mt, multige$ndat, multige$nX,
               p_fpx$embryo.time, p_fpx$cell.subtype, 1:8)
+dev.off()
 
 res <- lapply(1:4, function(i){
-  set.seed(654)
+  set.seed(i)
   p <- 0.8
   idx <- stratified_split(cell_subtypes, p)
   
@@ -208,4 +210,36 @@ res <- lapply(1:4, function(i){
 })
 
 saveRDS(res, file = "./data/neurons_raptor_res.rds")
-rse <- readRDS(file = "./data/neurons_raptor_res.rds")
+res <- readRDS(file = "./data/neurons_raptor_res.rds")
+
+svg("fig/neurons_staged_trainset.svg")
+plot_staged(res[[1]]$train$ae_s$ae.lin, p_fpx[res[[1]]$train$idx, ]$embryo.time,
+            lapply(lins,'[', res[[1]]$train$idx))
+dev.off()
+
+lapply(seq_along(res), function(i){
+  svg(paste0("fig/neurons_staged_testset_", i,".svg"))
+  plot_staged(res[[i]]$test$ae_s$ae.lin, p_fpx[res[[1]]$test$idx, ]$embryo.time,
+              lapply(lins,'[', res[[1]]$test$idx), mode="diag")
+  dev.off()
+})
+
+svg("fig/neurons_lineage_inference_norm_trainset.svg")
+plot_lineage_inference_norm(res[[1]]$train$ae_s$ae.lin,
+                            p_fpx[res[[1]]$train$idx, ]$cell.subtype,
+                            ctypes[c(1,5,4,6,3,2)],
+                            p_fpx[res[[1]]$train$idx, ]$embryo.time,
+                            lapply(lins,'[', res[[1]]$train$idx))
+dev.off()
+
+svg("fig/neurons_lineage_inference_norm_testset.svg")
+plot_lineage_inference_norm(res[[1]]$test$ae_s$ae.lin,
+                            p_fpx[res[[1]]$test$idx, ]$cell.subtype,
+                            ctypes[c(1,5,4,6,3,2)],
+                            p_fpx[res[[1]]$test$idx, ]$embryo.time,
+                            lapply(lins,'[', res[[1]]$test$idx))
+dev.off()
+
+reduce_lineage_inference(res, p_fpx, "train")
+
+reduce_lineage_inference(res, p_fpx, "test")
