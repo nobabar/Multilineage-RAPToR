@@ -1,6 +1,3 @@
-rm(list = ls())
-setwd(this.path::here())
-
 multige_im <- function(X, p, 
                        lineages, formulas,
                        dim_red=c('pca','ica'), nc=min(c(10, ncol(X))), ncs=NULL){

@@ -53,6 +53,23 @@ dev.off()
 pX <- pX[,filt>thr]
 p_fpx <- p_fpx[filt>thr,]
 
+# build train and test
+p <- 0.8
+strats <- p_fpx$cell.subtype
+
+rr <- split(1:length(strats), strats)
+idx <- sort(as.numeric(unlist(sapply(rr, function(x) sample(x, length(x) * p)))))
+
+pX_train <- pX[idx, ]
+pX_test <- pX[-idx, ]
+
+p_fpx_train <- p_fpx[idx, ]
+p_fpx_test <- p_fpx[-idx, ]
+
+table(p_fpx$cell.subtype) / nrow(p_fpx)
+table(p_fpx_train$cell.subtype) / nrow(p_fpx_train)
+table(p_fpx_test$cell.subtype) / nrow(p_fpx_test)
+
 saveRDS(pX, file = "./data/neurons_gene_count_matrix_packer.rds")
 saveRDS(p_fpx, file = "./data/neurons_metadata_packer.rds")
 
