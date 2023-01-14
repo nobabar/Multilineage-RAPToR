@@ -157,14 +157,7 @@ lins <- list(
 prepare_and_interpolate <- function(X, p, lins, dim_red="ica", nc=8){
   mt <- multige_im(X = X, p = p, lineages = lins,
                    dim_red = dim_red, nc = nc,
-                   formulas = c("X~s(embryo.time, bs='cr', k=6)",
-                                "X~s(embryo.time, bs='cr', k=6)",
-                                "X~s(embryo.time, bs='cs', k=6)",
-                                "X~s(embryo.time, bs='cr', k=5)",
-                                "X~s(embryo.time, bs='cr', k=5)",
-                                "X~s(embryo.time, bs='cr', k=5)",
-                                "X~s(embryo.time, bs='cr', k=4)",
-                                "X~s(embryo.time, bs='cr', k=4)"))
+                   formulas = c("X~s(embryo.time, bs='cr', k=6)"))
   
   # predict new data (in comp. space)
   ndat <- data.frame(embryo.time=seq(min(p$embryo.time),
@@ -176,6 +169,21 @@ prepare_and_interpolate <- function(X, p, lins, dim_red="ica", nc=8){
 }
 
 multige <- prepare_and_interpolate(pX, p_fpx, lins)
+
+svg("fig/neurons_ica_pairs.svg",  width=8, height=6)
+pairs(multige$mt$dim_red$S[,1:4], col = cols, pch=pchs, lwd=2, labels=paste0("Comp.", 1:4), oma=c(2,2,2,25))
+par(xpd = TRUE)
+legend("bottomright", pch = as.numeric(as.factor(unique(cell_subtypes))),
+       legend = c(levels(as.factor(cell_subtypes))), title="Lineage")
+legend_image <- as.raster(matrix(viridisLite::inferno(max(p_fpx$embryo.time), end=.9), ncol=1))
+text(x=.85, y=.85, labels = "Time")
+rasterImage(legend_image, .8, .8, .9, .5)
+rect(.8, .5, .9, .8)
+labs <- seq(0, max(p_fpx$embryo.time),50)
+ys <- seq(.5, .78, l=length(labs))
+text(x=.903, y=ys, labels = "-") 
+text(x=.94, y=ys, labels = labs)
+dev.off()
 
 svg("fig/neurons_lineage.svg")
 plot_lineages(multige$mt, multige$ndat, multige$nX,
