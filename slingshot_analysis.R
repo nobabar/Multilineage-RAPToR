@@ -1,3 +1,8 @@
+library(dplyr)
+library(Seurat)
+library(slingshot)
+library(viridis)
+
 # data ----
 
 pX <- readRDS(file = "./data/neurons_gene_count_matrix_packer.rds")
@@ -7,7 +12,8 @@ seu <- readRDS(file = "./data/neurons_seu_packer.rds")
 # slingshot ----
 
 set.seed(654)
-sds <- slingshot(Embeddings(seu, "umap"), clusterLabels = seu$seurat_clusters, stretch = 0)
+sds <- slingshot(Embeddings(seu, "umap"), clusterLabels = seu$seurat_clusters,
+                 start.clus = 4, end.clus=c(), stretch = 0)
 sds <- as.SlingshotDataSet(sds)
 
 # create the color palette
