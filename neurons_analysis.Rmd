@@ -313,7 +313,7 @@ plot_staged(res[[1]]$train$ae_s$ae.lin, p_fpx[res[[1]]$train$idx, ]$embryo.time,
 Predictions for test :
 
 ```{r, message=FALSE, results=FALSE}
-summary_df <- lapply(seq_along(res), function(i){
+lapply(seq_along(res), function(i){
   plot_staged(res[[i]]$test$ae_s$ae.lin, p_fpx[res[[1]]$test$idx, ]$embryo.time,
               lapply(lins,'[', res[[1]]$test$idx), mode="diag")
 })
