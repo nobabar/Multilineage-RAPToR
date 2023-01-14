@@ -34,6 +34,8 @@ source("multige_im.R")
 source("utils.R")
 ```
 
+Load data and keep only neurons lineages.
+
 ```{r}
 dspacker <- readRDS("./data/eset_packer.rds")
 dspacker$lineage2 <- substr(dspacker$lineage, 1, 2) # make 2 char lineage
@@ -43,6 +45,13 @@ csel <- grepl(pattern = "ASE|ASJ|AUA", dspacker$cell.subtype)
 table(dspacker$cell.subtype[csel], dspacker$embryo.time.bin[csel])
 
 pX <- exprs(dspacker) # extract counts
+```
+
+# Preprocessing data
+
+We remove non/low-expressed genes and quantile-normalize the expression data, as well as apply a log(X+1) transformation. We then filter out poor quality samples using correlation with other samples.
+
+```{r}
 table(rowSums(pX) < 10) # filter low-expressed genes (also to lighten the data)
 
 # select annotated cells from one batch
@@ -51,11 +60,7 @@ sel_cells <- dspacker$batch == "Waterston_400_minutes" & dspacker$lineage != "un
 pX <- as.matrix(pX[rowSums(pX) > 10, sel_cells])
 
 p_fpx <- pData(dspacker)[sel_cells,]
-```
 
-# Preprocessing data
-
-```{r}
 # normalize & log
 pX <- limma::normalizeBetweenArrays(pX, method = "quantile")
 pX <- log1p(pX)
@@ -84,7 +89,7 @@ seu <- AddMetaData(seu, p_fpx["cell.subtype"],
                    col.name = "cell.subtype")
 ```
 
-Distribution of different celltypes
+Distribution of different cell types :
 
 ```{r, fig.height=8}
 VlnPlot(seu, c("nCount_RNA", "nFeature_RNA"), pt.size = 0.1, ncol = 1, group.by = "cell.subtype")
@@ -99,94 +104,6 @@ seu <- RunPCA(seu)
 seu <- RunUMAP(seu, n.neighbors = 10, dims = 1:50, spread = 2, min.dist = 0.3, seed.use = 654)
 DimPlot(seu, reduction = "umap",
         group.by = "cell.subtype", pt.size = 0.5, label = TRUE, repel = TRUE)
-```
-
-# Search clusters
-
-clusters correspond to cell types
-
-```{r, message=FALSE}
-seu <- FindNeighbors(seu, verbose = FALSE, dims = 1:50)
-seu <- FindClusters(seu, algorithm = 1, random.seed = 654, resolution = 1)
-
-# Plot the clusters
-DimPlot(seu, reduction = "umap", group.by = "seurat_clusters", pt.size = 0.5, label = TRUE)
-```
-
-# Slingshot
-
-```{r}
-# slingshot ----
-set.seed(654)
-sds <- slingshot(Embeddings(seu, "umap"), clusterLabels = seu$seurat_clusters, stretch = 0)
-sds <- as.SlingshotDataSet(sds)
-
-# create the color palette
-cell_pal <- function(cell_vars, pal_fun,...) {
-  if (is.numeric(cell_vars)) {
-    pal <- pal_fun(100, ...)
-    return(pal[cut(cell_vars, breaks = 100)])
-  } else {
-    categories <- sort(unique(cell_vars))
-    pal <- setNames(pal_fun(length(categories), ...), categories)
-    return(pal[cell_vars])
-  }
-}
-
-cell_colors <- cell_pal(seu$cell.subtype, brewer_pal("qual", "Set2"))
-cell_colors_clust <- cell_pal(seu$seurat_clusters, hue_pal())
-
-
-curves <- as.SlingshotDataSet(getCurves(sds, approx_points = 300, thresh = 0.01,
-                                        stretch = 0.8, allow.breaks = FALSE,
-                                        shrink = 0.99))
-```
-
-Lineages inferred by slingshot :
-
-```{r}
-plot(slingReducedDim(sds), col = cell_colors, pch = 16)
-lines(curves, lwd = 3, col = "black")
-```
-
-```{r}
-pt <- slingPseudotime(sds)
-nms <- colnames(pt)
-pal <- viridis(100, end = 0.95)
-par(mfrow = c(1, 2))
-for (i in nms) {
-  colors <- pal[cut(pt[,i], breaks = 100)]
-  plot(slingReducedDim(sds), col = colors, pch = 16, main = i)
-  lines(curves, lwd = 2, col = 'black')
-}
-```
-
-# Differential expression
-
-```{r}
-counts <- as.matrix(seu@assays$RNA@counts[seu@assays$RNA@var.features, ])
-dim(counts)
-
-sce <- fitGAM(counts = as.matrix(counts), sds = curves)
-```
-
-We can look at which genes are differentially expressed along lineages.
-
-```{r}
-pseudotime_association <- associationTest(sce)
-pseudotime_association$fdr <- p.adjust(pseudotime_association$pvalue, method = "fdr")
-pseudotime_association <- pseudotime_association[order(pseudotime_association$pvalue), ]
-pseudotime_association$feature_id <- rownames(pseudotime_association)
-
-plot_differential_expression <- function(feature_id, counts, clustering) {
-  feature_id <- pseudotime_association %>% filter(pvalue < 0.05) %>% top_n(1, -waldStat) %>% pull(feature_id)
-  cowplot::plot_grid(plotGeneCount(curves, counts, gene = feature_id[1], clusters = clustering, models = sce) + ggplot2::theme(legend.position = "none"), 
-                     plotSmoothers(sce, as.matrix(counts), gene = feature_id[1]))
-}
-
-feature_id <- pseudotime_association %>% filter(pvalue < 0.05) %>% top_n(1, -waldStat) %>% pull(feature_id)
-
-plot_differential_expression(feature_id, counts, seu$seurat_clusters)
 ```
 
 # Dimension reduction
