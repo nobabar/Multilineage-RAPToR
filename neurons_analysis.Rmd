@@ -29,6 +29,7 @@ library(tradeSeq)
 library(viridis)
 library(wormRef)
 
+source("ale.R")
 source("multige_im.R")
 source("utils.R")
 ```
@@ -271,11 +272,11 @@ plot_lineages(multige$mt, multige$ndat, multige$nX,
               p_fpx$embryo.time, p_fpx$cell.subtype, 1:8)
 ```
 
-# Staging
-
 ```{r, message=FALSE, results=FALSE}
 res <- lapply(1:4, function(i){
-  idx <- stratified_split(cell_subtypes)
+  set.seed(i)
+  p <- 0.8
+  idx <- stratified_split(cell_subtypes, p)
   
   pX_train <- pX[, idx]
   pX_test <- pX[, -idx]
@@ -288,15 +289,9 @@ res <- lapply(1:4, function(i){
   
   multige <- prepare_and_interpolate(pX_train, p_fpx_train, lins_train)
   
-  ae_s_train <- lapply(multige$interpGE, function(rdat){
-    RAPToR::ae(samp = pX_train, refdata = rdat, ref.time_series = multige$ndat$embryo.time,
-        bootstrap.n = 30)
-  })
+  ae_s_train <- ale(samp = pX_train, multiref=list(interpGE=multige$interpGE, time=multige$ndat$embryo.time))
   
-  ae_s_test <- lapply(multige$interpGE, function(rdat){
-    RAPToR::ae(samp = pX_test, refdata = rdat, ref.time_series = multige$ndat$embryo.time,
-        bootstrap.n = 30)
-  })
+  ae_s_test <- ale(samp = pX_test, multiref=list(interpGE=multige$interpGE, time=multige$ndat$embryo.time))
   
   return(list(multige=multige,
               train=list(idx=idx,
@@ -306,16 +301,22 @@ res <- lapply(1:4, function(i){
 })
 ```
 
+# Staging
+
 Predictions for train :
 
 ```{r, message=FALSE, results=FALSE}
-plot_staged(res[[1]]$train$ae_s, p_fpx[res[[1]]$train$idx, ]$embryo.time, lapply(lins,'[', res[[1]]$train$idx))
+plot_staged(res[[1]]$train$ae_s$ae.lin, p_fpx[res[[1]]$train$idx, ]$embryo.time,
+            lapply(lins,'[', res[[1]]$train$idx))
 ```
 
 Predictions for test :
 
 ```{r, message=FALSE, results=FALSE}
-plot_staged(res[[1]]$test$ae_s, p_fpx[res[[1]]$test$idx, ]$embryo.time, lapply(lins,'[', res[[1]]$test$idx))
+summary_df <- lapply(seq_along(res), function(i){
+  plot_staged(res[[i]]$test$ae_s$ae.lin, p_fpx[res[[1]]$test$idx, ]$embryo.time,
+              lapply(lins,'[', res[[1]]$test$idx), mode="diag")
+})
 ```
 
 Results from 4 differents runs :
@@ -343,7 +344,7 @@ reduce_cor(res, lins, p_fpx, "test", "spearman")
 # Exploring lineage-inference from staging
 
 ```{r, message=FALSE, results=FALSE}
-plot_lineages_inference(res[[1]]$train$ae_s,
+plot_lineages_inference(res[[1]]$train$ae_s$ae.lin,
                         p_fpx[res[[1]]$train$idx, ]$cell.subtype,
                         ctypes[c(1,5,4,6,3,2)],
                         lapply(lins,'[', res[[1]]$train$idx))
@@ -351,7 +352,7 @@ plot_lineages_inference(res[[1]]$train$ae_s,
 
 
 ```{r, message=FALSE, results=FALSE}
-plot_lineages_inference(res[[1]]$test$ae_s,
+plot_lineages_inference(res[[1]]$test$ae_s$ae.lin,
                         p_fpx[res[[1]]$test$idx, ]$cell.subtype,
                         ctypes[c(1,5,4,6,3,2)],
                         lapply(lins,'[', res[[1]]$test$idx))
@@ -374,7 +375,7 @@ reduce_summary(res, lins, ctypes[c(1,5,4,6,3,2)], "test")
 Predictions for train :
 
 ```{r, message=FALSE, results=FALSE}
-plot_lineage_inference_norm(res[[1]]$train$ae_s,
+plot_lineage_inference_norm(res[[1]]$train$ae_s$ae.lin,
                             p_fpx[res[[1]]$train$idx, ]$cell.subtype,
                             ctypes[c(1,5,4,6,3,2)],
                             p_fpx[res[[1]]$train$idx, ]$embryo.time,
@@ -384,7 +385,7 @@ plot_lineage_inference_norm(res[[1]]$train$ae_s,
 Predictions for test :
 
 ```{r, message=FALSE, results=FALSE}
-plot_lineage_inference_norm(res[[1]]$test$ae_s,
+plot_lineage_inference_norm(res[[1]]$test$ae_s$ae.lin,
                             p_fpx[res[[1]]$test$idx, ]$cell.subtype,
                             ctypes[c(1,5,4,6,3,2)],
                             p_fpx[res[[1]]$test$idx, ]$embryo.time,
@@ -395,10 +396,11 @@ Results from 4 different runs :
 
 train :
 ```{r}
-reduce_norm_summary(res, lins, ctypes[c(1,5,4,6,3,2)], "train")
+reduce_lineage_inference(res, p_fpx, "train")
 ```
 
 test :
 ```{r}
-reduce_norm_summary(res, lins, ctypes[c(1,5,4,6,3,2)], "test")
+reduce_lineage_inference(res, p_fpx, "test")
 ```
+
