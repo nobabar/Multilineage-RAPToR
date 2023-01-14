@@ -1,6 +1,6 @@
 stratified_split <- function(strats, prop){
   rr <- split(1:length(strats), strats)
-  idx <- sort(as.numeric(unlist(sapply(rr, function(x) sample(x, length(x) * p)))))
+  idx <- sort(as.numeric(unlist(sapply(rr, function(x) sample(x, length(x) * prop)))))
   return(idx)
 }
 
@@ -31,7 +31,7 @@ reduce_cor <- function(res, lins, m, set, method="pearson"){
       l <- lins[[j]][res[[i]][[set]]$idx]
       sapply(seq_along(lins), function(k){
         r <- round(cor(m[res[[i]][[set]]$idx, ]$embryo.time[l],
-                       res[[i]][[set]]$ae_s[[k]]$age.estimates[l,1],
+                       res[[i]][[set]]$ae_s$ae.lin[[k]]$age.estimates[l,1],
                        method = method), 3)
       })
     })
@@ -50,7 +50,7 @@ reduce_summary <- function(res, lins, ctypes, set){
       ss <- which(cell_subtypes[res[[i]][[set]]$idx]==ci)
       
       # get cor. score at estimate for each reference
-      ccs <- do.call(cbind, lapply(res[[i]][[set]]$ae_s, function(a) a$age.estimates[ss,"cor.score"]))
+      ccs <- do.call(cbind, lapply(res[[i]][[set]]$ae_s$ae.lin, function(a) a$age.estimates[ss,"cor.score"]))
       colnames(ccs) <- names(lins)
       as.data.frame(apply(ccs, 2, summary))
     })
@@ -66,7 +66,7 @@ reduce_norm_summary <- function(res, lins, ctypes, set){
       ss <- which(cell_subtypes[res[[i]][[set]]$idx]==ci)
       
       # get cor. score at estimate for each reference
-      ccs <- do.call(cbind, lapply(res[[i]][[set]]$ae_s, function(a) a$age.estimates[ss,"cor.score"]))
+      ccs <- do.call(cbind, lapply(res[[i]][[set]]$ae_s$ae.lin, function(a) a$age.estimates[ss,"cor.score"]))
       ccs <- t(apply(ccs, 1, levelmin))
       colnames(ccs) <- names(lins)
       as.data.frame(apply(ccs, 2, summary))
@@ -75,6 +75,15 @@ reduce_norm_summary <- function(res, lins, ctypes, set){
   })
   names(summary_df) <- ctypes
   return(summary_df)
+}
+
+reduce_lineage_inference <- function(res, m, set){
+  inference_df <- lapply(seq_along(res), function(i){
+    known <- m[res[[1]][[set]]$idx, ]$cell.subtype
+    predicted <- res[[1]][[set]]$ae_s$ale$lin.est
+    table(known, predicted) / rowSums(table(known, predicted))
+  })
+  Reduce(`+`, inference_df)/length(inference_df)
 }
 
 plot_lineages <- function(mt, ndat, nX, time, ctypes, ncs){
@@ -95,12 +104,18 @@ plot_lineages <- function(mt, ndat, nX, time, ctypes, ncs){
   })
 }
 
-plot_staged <- function(ae_s, time, lins){
-  par(mfrow = c(length(lins), length(lins)), mar=c(3,1,2,1), pty='s', bty='l')
+plot_staged <- function(ae_s, time, lins, mode="all"){
+  par(mfrow = c(ifelse(mode=="all", length(lins), 1), length(lins)), mar=c(3,1,2,1), pty='s', bty='l')
   xl <- range(time)
   sapply(seq_along(lins), function(i){
     l <- lins[[i]]
-    sapply(seq_along(lins), function(j){
+    if (mode == "all"){
+      reference_lins_idx <- seq_along(lins)
+    }
+    else if (mode == "diag"){
+      reference_lins_idx <- i
+    }
+    sapply(reference_lins_idx, function(j){
       x <- time[l]
       y <- ae_s[[j]]$age.estimates[l,1]
       
@@ -119,6 +134,13 @@ plot_staged <- function(ae_s, time, lins){
 
 plot_lineages_inference <- function(ae_s, cell_subtypes, ctypes, lins){
   par(mfrow = c(2,length(ctypes) / 2), mar=c(3,3,2,1), bty='l')
+  
+  y_lim <- sapply(ctypes[c(1,5,4,6,3,2)], function(ci){
+    ss <- which(cell_subtypes==ci)
+    range(as.vector(sapply(ae_s, function(a) a$age.estimates[ss,"cor.score"])))
+  })
+  y_lim <- c(trunc(min(y_lim[1,]) * 10) / 10, ceiling(max(y_lim[2,]) * 10) / 10)
+  
   sapply(ctypes, function(ci){
     ss <- which(cell_subtypes==ci) # select a cell type
     
@@ -126,7 +148,7 @@ plot_lineages_inference <- function(ae_s, cell_subtypes, ctypes, lins){
     ccs <- do.call(cbind, lapply(ae_s, function(a) a$age.estimates[ss,"cor.score"]))
     colnames(ccs) <- names(lins)
     boxplot(ccs, border=seq_along(lins), las=2,
-            lwd=2, ylim=c(0, 1), col = 0, boxwex=.4,
+            lwd=2, ylim=y_lim, col = 0, boxwex=.4,
             ylab = "Cor. at estimate", xlab = "reference used", main = ci)
     mtext(paste0('n=',length(ss)), at=.5, line=-1, cex=.75, side=3, adj = 0)
   })
