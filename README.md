@@ -33,10 +33,14 @@ In addition to these two you will find several utility functions in the `utils.R
 
 # Data
 
-For this analysis we worked with a single-cell C.elegans dataset [(Packer et al. 2019)]{https://www.science.org/doi/10.1126/science.aax1971}. The data is accessible on [GEO: GSE126954]{https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE126954}. The data is also accessible via the VisCello R package (Zhu, Murray, Tan, and Kim 2019) and the expression matrix is directly downloadable from their GitHub repository [here]{https://media.githubusercontent.com/media/qinzhu/VisCello.celegans/master/inst/app/data/eset.rds}.
+For this analysis we worked with a single-cell C.elegans dataset [Packer et al. (2019)]{https://www.science.org/doi/10.1126/science.aax1971}. The data is accessible on [GEO: GSE126954]{https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE126954}. The data is also accessible via the VisCello R package (Zhu, Murray, Tan, and Kim 2019) and the expression matrix is directly downloadable from their GitHub repository [here]{https://media.githubusercontent.com/media/qinzhu/VisCello.celegans/master/inst/app/data/eset.rds}.
 
 # Usage
 
 The whole analysis can be found in the `neurons_analysis.R` file as well as the `neurons_analysis.Rms` notebook, compiled with knitr into the `neurons_analysis.html` file.
 
 Several figures were generated in the `fig` folder.
+
+A complete analysis of another dataset is also accessible in the `multit_traj.R` file. In this one we analysed a single-cell profiling data by [Hashimshony et al. (2015)]{https://www.nature.com/articles/nature13996}. The data is accessible on [GEO: GSE50548]{https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE50548}.
+
+Finaly, a slingshot demonstration can be found in the `slingshot_analysis.R` file.
