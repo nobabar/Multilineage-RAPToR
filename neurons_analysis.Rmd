@@ -1,7 +1,7 @@
 ---
 title: "Multi traj RAPToR"
 author: "Baptiste Rousseau"
-date: "2023-11-01"
+date: "2023-01-15"
 output:
   html_document:
     toc: true
@@ -178,6 +178,8 @@ multige <- prepare_and_interpolate(pX, p_fpx, lins)
 ```
 
 ```{r, message=FALSE, results=FALSE}
+cols <- viridisLite::inferno(max(p_fpx$embryo.time), end=.9)[p_fpx$embryo.time]
+pchs <- as.numeric(as.factor(cell_subtypes))
 pairs(multige$mt$dim_red$S[,1:4], col = cols, pch=pchs, lwd=2, labels=paste0("Comp.", 1:4), oma=c(2,2,2,25))
 par(xpd = TRUE)
 legend("bottomright", pch = as.numeric(as.factor(unique(cell_subtypes))),
