@@ -134,7 +134,7 @@ seu <- readRDS(file = "./data/neurons_seu_packer.rds")
 
 p_fpx$embryo.time <- p_fpx$embryo.time - min(p_fpx$embryo.time) + 1
 
-cell_subtypes <- seu$cell.subtype
+cell_subtypes <- p_fpx$cell.subtype
 
 # for plotting
 cols <- viridisLite::inferno(max(p_fpx$embryo.time), end=.9)[p_fpx$embryo.time]
@@ -227,8 +227,8 @@ dev.off()
 
 lapply(seq_along(res), function(i){
   svg(paste0("fig/neurons_staged_testset_", i,".svg"))
-  plot_staged(res[[i]]$test$ae_s$ae.lin, p_fpx[res[[1]]$test$idx, ]$embryo.time,
-              lapply(lins,'[', res[[1]]$test$idx), mode="diag")
+  plot_staged(res[[i]]$test$ae_s$ae.lin, p_fpx[res[[i]]$test$idx, ]$embryo.time,
+              lapply(lins,'[', res[[i]]$test$idx), mode="diag")
   dev.off()
 })
 

@@ -239,8 +239,8 @@ Predictions for test :
 
 ```{r, message=FALSE, results=FALSE}
 lapply(seq_along(res), function(i){
-  plot_staged(res[[i]]$test$ae_s$ae.lin, p_fpx[res[[1]]$test$idx, ]$embryo.time,
-              lapply(lins,'[', res[[1]]$test$idx), mode="diag")
+  plot_staged(res[[i]]$test$ae_s$ae.lin, p_fpx[res[[i]]$test$idx, ]$embryo.time,
+              lapply(lins,'[', res[[i]]$test$idx), mode="diag")
 })
 ```
 
