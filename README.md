@@ -1,6 +1,6 @@
 # Adding support to multiple branching trajectories on RAPToR
 
-This repository contains a demonstration of the RAPToR tool with multiple branching trajectories. The algorithm is described in [this paper]{https://www.nature.com/articles/s41592-022-01540-0}. The code is based on the [original RAPToR implementation]{https://github.com/LBMC/RAPToR}.
+This repository contains a demonstration of the RAPToR tool with multiple branching trajectories. The algorithm is described in [this paper](https://www.nature.com/articles/s41592-022-01540-0). The code is based on the [original RAPToR implementation](https://github.com/LBMC/RAPToR).
 
 # Implementation
 
@@ -21,7 +21,7 @@ dim_red: whether to use pca/ica
 nc: the number of components to extract
 ncs (optional): which components to keeo. defaults to 1:nc.
 
-We also developed a function to infer lineages on top of the usual RAPToR output. This function is the `ale` function in the `ale.R` file. It is based on the [original `ae` function]{https://github.com/LBMC/RAPToR/blob/master/R/ae.R}
+We also developed a function to infer lineages on top of the usual RAPToR output. This function is the `ale` function in the `ale.R` file. It is based on the [original `ae` function](https://github.com/LBMC/RAPToR/blob/master/R/ae.R).
 
 Parameters:
 samp: a gene expression matrix (genes by samples).
@@ -33,7 +33,7 @@ In addition to these two you will find several utility functions in the `utils.R
 
 # Data
 
-For this analysis we worked with a single-cell C.elegans dataset [Packer et al. (2019)]{https://www.science.org/doi/10.1126/science.aax1971}. The data is accessible on [GEO: GSE126954]{https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE126954}. The data is also accessible via the VisCello R package (Zhu, Murray, Tan, and Kim 2019) and the expression matrix is directly downloadable from their GitHub repository [here]{https://media.githubusercontent.com/media/qinzhu/VisCello.celegans/master/inst/app/data/eset.rds}.
+For this analysis we worked with a single-cell C.elegans dataset [Packer et al. (2019)](https://www.science.org/doi/10.1126/science.aax1971). The data is accessible on [GEO: GSE126954](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE126954). The data is also accessible via the VisCello R package (Zhu, Murray, Tan, and Kim 2019) and the expression matrix is directly downloadable from their GitHub repository [here](https://media.githubusercontent.com/media/qinzhu/VisCello.celegans/master/inst/app/data/eset.rds).
 
 # Usage
 
@@ -41,6 +41,6 @@ The whole analysis can be found in the `neurons_analysis.R` file as well as the 
 
 Several figures were generated in the `fig` folder.
 
-A complete analysis of another dataset is also accessible in the `multit_traj.R` file. In this one we analysed a single-cell profiling data by [Hashimshony et al. (2015)]{https://www.nature.com/articles/nature13996}. The data is accessible on [GEO: GSE50548]{https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE50548}.
+A complete analysis of another dataset is also accessible in the `multit_traj.R` file. In this one we analysed a single-cell profiling data by [Hashimshony et al. (2015)](https://www.nature.com/articles/nature13996). The data is accessible on [GEO: GSE50548](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE50548).
 
 Finaly, a slingshot demonstration can be found in the `slingshot_analysis.R` file.
