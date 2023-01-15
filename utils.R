@@ -121,7 +121,7 @@ plot_staged <- function(ae_s, time, lins, mode="all"){
       
       plot(x, y, xlim = xl, ylim = xl,
            main = paste0(names(lins)[i], ' lin /', names(lins)[j], ' ref'), 
-           col = i, xlab = "Blast. time", ylab="Estimated age")
+           col = i, xlab = "Embryo time", ylab="Estimated age")
       
       abline(a=0, b=1, lty=2) # add x=y
       # add cor.scores
@@ -155,7 +155,7 @@ plot_lineages_inference <- function(ae_s, cell_subtypes, ctypes, lins){
 }
 
 plot_lineage_inference_norm <- function(ae_s, cell_subtypes, ctypes, time, lins){
-  par(mfrow = c(2,length(ctypes) / 2), mar=c(3,2,2,1), bty='l', pty='s')
+  par(mfrow = c(2,length(ctypes) / 2), mar=c(3,4,2,1), bty='l', pty='s')
   sapply(ctypes, function(ci){
     ss <- which(cell_subtypes==ci) # select a cell type
     
@@ -166,7 +166,7 @@ plot_lineage_inference_norm <- function(ae_s, cell_subtypes, ctypes, time, lins)
     colnames(ccs) <- names(lins)
     plot(range(time), range(ccs), type = 'n',
          lwd=2, ylim=range(ccs), col = 0,
-         ylab = "Correlation diff. between lineages", xlab = "Blast. time", main = ci)
+         ylab = "Correlation diff. between lineages", xlab = "Embryo time", main = ci)
     sapply(seq_along(lins), function(i){
       points(x, ccs[,i], col = transp(i, a = .9), lwd=2)
     })
